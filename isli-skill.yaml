@@ -7,7 +7,7 @@ description: |
   Moroccan national portal https://www.marchespublics.gov.ma. Provides keyword search,
   category filtering, recent listings, and full announcement details including deadlines,
   buyer, location, estimated amount, and downloadable documents.
-version: "1.0.0"
+version: "1.0.1"
 author: ISLI Community
 category: web
 

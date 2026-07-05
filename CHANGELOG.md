@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 (2026-07-05)
+
+- Fixed Dockerfile base image tag: `v1.45.0-python3.12` does not exist on MCR; use `v1.45.0-jammy`.
+
 ## 1.0.0 (2026-07-05)
 
 - Initial release.

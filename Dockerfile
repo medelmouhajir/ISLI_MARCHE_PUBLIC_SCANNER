@@ -1,5 +1,6 @@
 # ISLI USR v2.0 skill: Morocco Public Procurement Scanner
-FROM mcr.microsoft.com/playwright/python:v1.45.0-python3.12
+# Valid MCR tags use an Ubuntu codename suffix (jammy/noble), not -python3.12.
+FROM mcr.microsoft.com/playwright/python:v1.45.0-jammy
 
 WORKDIR /app
 
