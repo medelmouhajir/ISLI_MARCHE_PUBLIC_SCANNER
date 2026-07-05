@@ -11,11 +11,13 @@ def verify_internal_auth(x_internal_auth: str = Header(default=None)) -> dict:
             detail="Missing X-Internal-Auth header",
         )
     try:
+        # ISLI Core's internal tokens do not include an "iss" claim, so we only
+        # verify the signature and expiry here. The issuer check is intentionally
+        # omitted to match Core's token format.
         payload = jwt.decode(
             x_internal_auth,
             settings.JWT_SECRET,
             algorithms=[settings.JWT_ALGORITHM],
-            issuer=settings.JWT_ISSUER,
         )
     except jwt.PyJWTError as exc:
         raise HTTPException(

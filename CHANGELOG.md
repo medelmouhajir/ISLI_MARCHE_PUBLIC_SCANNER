@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 (2026-07-05)
+
+- Fixed JWT auth: ISLI Core internal tokens do not include an `iss` claim, so the skill no longer requires one. It still verifies the signature and expiry.
+
 ## 1.0.1 (2026-07-05)
 
 - Fixed Dockerfile base image tag: `v1.45.0-python3.12` does not exist on MCR; use `v1.45.0-jammy`.
