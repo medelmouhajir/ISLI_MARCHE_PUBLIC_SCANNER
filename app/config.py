@@ -7,11 +7,13 @@ class Settings(BaseSettings):
     JWT_ISSUER: str = "isli-core"
 
     CACHE_TTL_SECONDS: int = 300
-    REQUEST_DELAY_MS: int = 750
+    REQUEST_DELAY_MS: int = 500
     MAX_CONCURRENT_PAGES: int = 1
     DEFAULT_MAX_PAGES_SCAN: int = 5
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
+    DEFAULT_MAX_RESULTS: int = 100
+    ABSOLUTE_MAX_RESULTS: int = 500
 
     PORTAL_BASE_URL: str = "https://www.marchespublics.gov.ma"
     USER_AGENT: str = (

@@ -2,7 +2,9 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.config import settings
 
 
 class Category(str, Enum):
@@ -59,17 +61,35 @@ class SearchRequest(BaseModel):
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
     max_pages_to_scan: Optional[int] = Field(default=None, ge=1, le=20)
+    max_results: int = Field(
+        default=100,
+        ge=1,
+        le=500,
+        description="Hard cap on how many matching announcements to scan. Pagination happens within this cap.",
+    )
+    limit: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=500,
+        description="Convenience top-N mode. When set, returns the first N matches and ignores page/page_size/max_results.",
+    )
 
-    @field_validator("page_size")
-    @classmethod
-    def cap_page_size(cls, v: int) -> int:
-        return min(v, 100)
+    @model_validator(mode="after")
+    def normalize_limit_mode(self) -> "SearchRequest":
+        if self.limit:
+            self.page = 1
+            self.page_size = self.limit
+            self.max_results = self.limit
+        return self
 
 
 class SearchResponse(BaseModel):
     total_estimated: Optional[int] = None
     page: int
     page_size: int
+    matches_found: int
+    returned_count: int
+    scanned_portal_pages: int
     results: List[AnnouncementSummary] = Field(default_factory=list)
     source_url: str
 
@@ -91,5 +111,8 @@ class RecentRequest(BaseModel):
 
 class RecentResponse(BaseModel):
     total_estimated: Optional[int] = None
+    matches_found: int
+    returned_count: int
+    scanned_portal_pages: int
     results: List[AnnouncementSummary] = Field(default_factory=list)
     source_url: str

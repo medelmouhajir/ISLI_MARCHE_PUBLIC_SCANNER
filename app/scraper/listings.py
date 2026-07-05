@@ -1,5 +1,6 @@
 import copy
 import re
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import List, Optional
 
@@ -18,17 +19,41 @@ from app.scraper.parser import (
 )
 
 
-async def search_announcements(request: SearchRequest) -> tuple[List[AnnouncementSummary], Optional[int], str]:
-    """Return (results for requested page, portal_total_estimate, source_url)."""
+@dataclass(frozen=True)
+class SearchOutcome:
+    results: List[AnnouncementSummary]
+    matches_found: int
+    total_estimated: Optional[int]
+    scanned_portal_pages: int
+    source_url: str
+
+
+async def search_announcements(request: SearchRequest) -> SearchOutcome:
     base_url = f"{settings.PORTAL_BASE_URL}/index.php?AllCons=&page=entreprise.EntrepriseAdvancedSearch"
+
+    # Effective pagination and cap.
+    if request.limit:
+        page = 1
+        page_size = request.limit
+        max_matches = request.limit
+    else:
+        page = request.page
+        page_size = request.page_size
+        max_matches = request.max_results or settings.DEFAULT_MAX_RESULTS
+
     max_pages_scan = request.max_pages_to_scan or settings.DEFAULT_MAX_PAGES_SCAN
 
-    needed = request.page * request.page_size
     all_matches: List[AnnouncementSummary] = []
     portal_total: Optional[int] = None
+    scanned_portal_pages = 0
 
     async with PortalClient() as client:
-        html_pages = await client.fetch_html_with_next(base_url, next_clicks=max_pages_scan - 1)
+        html_pages, scanned_portal_pages = await client.fetch_search_result_pages(
+            base_url,
+            max_pages=max_pages_scan,
+            max_matches=max_matches,
+            page_size=500,
+        )
 
     for html in html_pages:
         page_total = _extract_total_count(html)
@@ -38,27 +63,40 @@ async def search_announcements(request: SearchRequest) -> tuple[List[Announcemen
         for row in rows:
             if _matches(row, request):
                 all_matches.append(row)
-            if len(all_matches) >= needed:
+            if len(all_matches) >= max_matches:
                 break
-        if len(all_matches) >= needed:
+        if len(all_matches) >= max_matches:
             break
 
-    start = (request.page - 1) * request.page_size
-    end = start + request.page_size
-    return all_matches[start:end], portal_total, base_url
+    matches_found = len(all_matches)
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated = all_matches[start:end]
+
+    return SearchOutcome(
+        results=paginated,
+        matches_found=matches_found,
+        total_estimated=portal_total,
+        scanned_portal_pages=scanned_portal_pages,
+        source_url=base_url,
+    )
 
 
 async def list_recent_announcements(
     category: Optional[str] = None,
     limit: int = 10,
-) -> tuple[List[AnnouncementSummary], Optional[int], str]:
+) -> SearchOutcome:
     base_url = f"{settings.PORTAL_BASE_URL}/index.php?AllCons=&page=entreprise.EntrepriseAdvancedSearch"
     results: List[AnnouncementSummary] = []
     portal_total: Optional[int] = None
 
     async with PortalClient() as client:
-        # Scan first 2 portal pages to get a reasonable recent set.
-        html_pages = await client.fetch_html_with_next(base_url, next_clicks=1)
+        html_pages, scanned_portal_pages = await client.fetch_search_result_pages(
+            base_url,
+            max_pages=2,
+            max_matches=limit,
+            page_size=500,
+        )
 
     for html in html_pages:
         page_total = _extract_total_count(html)
@@ -73,18 +111,21 @@ async def list_recent_announcements(
         if len(results) >= limit:
             break
 
-    return results[:limit], portal_total, base_url
+    return SearchOutcome(
+        results=results[:limit],
+        matches_found=len(results),
+        total_estimated=portal_total,
+        scanned_portal_pages=scanned_portal_pages,
+        source_url=base_url,
+    )
 
 
 def _extract_total_count(html: str) -> Optional[int]:
     bs = soup(html)
-    # The count is rendered inside a dedicated span, e.g.
-    # <span id="ctl0_CONTENU_PAGE_resultSearch_nombreElement">99643</span>
     span = bs.find("span", id=re.compile(r"nombreElement"))
     if span:
         digits = re.sub(r"\D", "", span.get_text())
         return int(digits) if digits else None
-    # Fallback for pages where the count is plain text without a dedicated span.
     pattern = re.compile(r"Nombre de résultats\s*:\s*([\d\s\xa0]+)")
     for text_node in bs.find_all(string=pattern):
         match = pattern.search(text_node)
@@ -162,7 +203,6 @@ def _visible_text(el: Tag, separator: str = "\n") -> str:
     clone = copy.copy(el)
     for popup in clone.find_all(class_=["info-bulle", "info-suite"]):
         popup.decompose()
-    # Also drop inline hidden nodes; they usually duplicate visible text as tooltips.
     for hidden in clone.find_all(style=re.compile(r"display\s*:\s*none", re.I)):
         hidden.decompose()
     return clean_text(clone.get_text(separator)) or ""
@@ -191,11 +231,9 @@ def _text_after_label(cell: Tag, id_pattern: str, label: str) -> Optional[str]:
     full_text = _visible_text(el)
     if not full_text:
         return None
-    # Remove the label prefix, e.g. "Objet : value" or "Acheteur public : value".
     prefix = f"{label} :"
     if full_text.startswith(prefix):
         return clean_text(full_text[len(prefix):])
-    # Some pages split label and value across elements; try a looser match.
     for line in full_text.split("\n"):
         if line.strip().lower().startswith(label.lower()):
             parts = line.split(":", 1)
@@ -217,7 +255,6 @@ def _deadline_from_cell(cell: Tag) -> Optional[datetime]:
     cloture = cell.find("div", class_="cloture-line")
     if cloture:
         return parse_portal_datetime(_visible_text(cloture, " "))
-    # Fallback: any date+time pattern in the cell.
     text = _visible_text(cell, " ")
     match = re.search(r"\b(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2})\b", text)
     if match:

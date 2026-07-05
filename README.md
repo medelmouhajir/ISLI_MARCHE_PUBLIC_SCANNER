@@ -5,6 +5,7 @@ An [ISLI AI](https://github.com/medelmouhajir/isli-skills-registry) **Universal 
 ## What it does
 
 - **Search consultations** by keyword, category, procedure, location, buyer, publication date, and deadline.
+- **Limit results** with a convenient `limit` top-N mode or a `max_results` hard cap.
 - **List recent announcements** optionally filtered by category.
 - **Get full details** of a single announcement, including deadlines, buyer, location, estimated amount, contact info, and document download links.
 
@@ -59,12 +60,23 @@ print(res.json())
 PY
 ```
 
+## Result limiting
+
+`/search` supports two ways to control result volume:
+
+- **`limit`** — top-N mode. Setting `limit: 20` returns the first 20 matches and ignores `page`/`page_size`/`max_results`.
+- **`max_results`** — hard cap (default 100, max 500). The scraper stops once this many matches are found, and normal pagination happens within the capped set.
+
+Use `max_pages_to_scan` (default 5, max 20) to bound how many portal result pages are loaded.
+
+The scraper requests 500 results per portal page to minimize round-trips.
+
 ## Limitations
 
 - **No public API** — the portal is scraped; selectors may need updates if the site redesigns.
-- **Search is client-side filtered** — because the portal's search form uses JavaScript postbacks, the skill scans result pages and filters locally. Deeply paginated filtered results are limited by `max_pages_to_scan`.
+- **Search is client-side filtered** — because the portal's search form uses JavaScript postbacks, the skill scans result pages and filters locally. Deeply paginated filtered results are limited by `max_results` and `max_pages_to_scan`.
 - **Read-only** — the skill does not submit bids, log in, or interact with the cart.
-- **v1 scope** — open consultations only; BDC award/result notices and monitoring alerts are planned for future versions.
+- **Open consultations only** — BDC award/result notices and monitoring alerts are planned for future versions.
 
 ## Submit to the ISLI skills registry
 

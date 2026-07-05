@@ -8,11 +8,14 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 @router.post("", response_model=SearchResponse)
 async def search(request: SearchRequest) -> SearchResponse:
-    results, total, source_url = await search_announcements(request)
+    outcome = await search_announcements(request)
     return SearchResponse(
-        total_estimated=total,
+        total_estimated=outcome.total_estimated,
         page=request.page,
         page_size=request.page_size,
-        results=results,
-        source_url=source_url,
+        matches_found=outcome.matches_found,
+        returned_count=len(outcome.results),
+        scanned_portal_pages=outcome.scanned_portal_pages,
+        results=outcome.results,
+        source_url=outcome.source_url,
     )
