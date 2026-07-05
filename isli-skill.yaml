@@ -1,0 +1,121 @@
+isli_version: "2.0"
+
+id: maroc-marches-publics-scanner
+name: Maroc Marchés Publics Scanner
+description: |
+  Search and retrieve open public procurement announcements (consultations) from the
+  Moroccan national portal https://www.marchespublics.gov.ma. Provides keyword search,
+  category filtering, recent listings, and full announcement details including deadlines,
+  buyer, location, estimated amount, and downloadable documents.
+version: "1.0.0"
+author: ISLI Community
+category: web
+
+runtime:
+  port: 8000
+  build:
+    context: "."
+    dockerfile: Dockerfile
+
+auth:
+  type: internal_jwt
+
+tools:
+  - name: search
+    description: |
+      Search open consultations on marchespublics.gov.ma. Supports keyword matching,
+      category/procedure/location/buyer filters, publication-date and deadline ranges,
+      and paginated results. Full-text filtering is performed client-side after scanning
+      portal pages, so very deep pages may require increasing max_pages_to_scan.
+    endpoint: /search
+    method: POST
+    parameters:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Free-text keyword matched against reference, object, buyer, or location.
+        category:
+          type: string
+          enum: [Travaux, Fournitures, Services]
+          description: Main category filter.
+        procedure:
+          type: string
+          description: Procedure type substring, e.g. "Appel d'offres ouvert".
+        location:
+          type: string
+          description: Place of execution substring.
+        buyer:
+          type: string
+          description: Public buyer name substring.
+        published_after:
+          type: string
+          format: date
+          description: ISO date (YYYY-MM-DD).
+        published_before:
+          type: string
+          format: date
+          description: ISO date (YYYY-MM-DD).
+        deadline_after:
+          type: string
+          format: date-time
+          description: ISO datetime (YYYY-MM-DDTHH:MM:SS).
+        deadline_before:
+          type: string
+          format: date-time
+          description: ISO datetime (YYYY-MM-DDTHH:MM:SS).
+        page:
+          type: integer
+          default: 1
+          minimum: 1
+          description: Result page number.
+        page_size:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 100
+          description: Number of results per page.
+        max_pages_to_scan:
+          type: integer
+          minimum: 1
+          maximum: 20
+          description: Maximum portal pages to scan when client-side filtering is needed.
+      required: []
+
+  - name: details
+    description: |
+      Retrieve the full details of a single consultation using its portal identifiers.
+    endpoint: /details
+    method: POST
+    parameters:
+      type: object
+      properties:
+        refConsultation:
+          type: string
+          description: Portal consultation reference number.
+        orgAcronyme:
+          type: string
+          description: Portal buyer/organization acronym code.
+      required:
+        - refConsultation
+        - orgAcronyme
+
+  - name: list_recent
+    description: |
+      Return the most recently published open consultations. Optionally filter by category.
+    endpoint: /list_recent
+    method: POST
+    parameters:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [Travaux, Fournitures, Services]
+          description: Main category filter.
+        limit:
+          type: integer
+          default: 10
+          minimum: 1
+          maximum: 100
+          description: Maximum number of announcements to return.
+      required: []

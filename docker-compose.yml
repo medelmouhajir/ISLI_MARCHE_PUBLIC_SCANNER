@@ -1,0 +1,15 @@
+services:
+  skill:
+    build: .
+    container_name: isli-maroc-marches-publics
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET=dev-secret-change-me
+      - JWT_ISSUER=isli-core
+      - LOG_LEVEL=info
+      - CACHE_TTL_SECONDS=300
+      - REQUEST_DELAY_MS=750
+      - DEFAULT_MAX_PAGES_SCAN=5
+      - DEFAULT_PAGE_SIZE=20
+      - MAX_PAGE_SIZE=100
